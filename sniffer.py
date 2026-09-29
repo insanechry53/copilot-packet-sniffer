@@ -1,4 +1,4 @@
-from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR, Raw
+from scapy.all import sniff, rdpcap, IP, TCP, UDP, DNS, DNSQR, Raw
 import re
 
 PACKET_COUNT = 25
@@ -92,7 +92,16 @@ def process_packet(packet):
             print(f"HTTP Request: {request_line}")
             print(f"HTTP Host: {host}")
 
-      def start_capture(interface="lo0"):
+def read_pcap(filename):
+    """Safely read packets from an authorized PCAP file."""
+    print(f"Reading authorized PCAP file: {filename}")
+
+    packets = rdpcap(filename)
+
+    for packet in packets[:PACKET_COUNT]:
+        process_packet(packet)
+
+def start_capture(interface="lo0"):
     """Capture authorized traffic from an allowed interface."""
 
     if interface not in ALLOWED_INTERFACES:
@@ -102,13 +111,24 @@ def process_packet(packet):
     print(f"Starting authorized capture on {interface}...")
     print(f"Capturing {PACKET_COUNT} packets.")
 
-    sniff(
-        iface=interface,
-        prn=process_packet,
-        count=PACKET_COUNT,
-        filter="tcp port 80 or udp port 53",
-        store=False
-    )
+    try:
+        sniff(
+            iface=interface,
+            prn=process_packet,
+            count=PACKET_COUNT,
+            filter="tcp port 80 or udp port 53",
+            store=False
+        )
+    except PermissionError:
+        print("Live capture permission denied.")
+        print("Defaulting to authorized PCAP mode.")
+
+        filename = input("Enter authorized PCAP filename: ").strip()
+
+        if filename.endswith(".pcap"):
+            read_pcap(filename)
+        else:
+            print("Error: Only .pcap files are allowed.")
 
 
 if __name__ == "__main__":
